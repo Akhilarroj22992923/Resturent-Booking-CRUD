@@ -1,0 +1,283 @@
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+class Restaurant {
+    String name;
+    String city;
+    String area;
+    String cuisine;
+    double rating;
+    double costForTwo;
+    boolean isVeg;
+    Map<String, List<Boolean>> slots; // Key: date, Value: list of 24 slots (each hour)
+
+    public Restaurant(String name, String city, String area, String cuisine, double rating, double costForTwo, boolean isVeg) {
+        this.name = name;
+        this.city = city;
+        this.area = area;
+        this.cuisine = cuisine;
+        this.rating = rating;
+        this.costForTwo = costForTwo;
+        this.isVeg = isVeg;
+        this.slots = new ConcurrentHashMap<>();
+    }
+}
+
+class RestaurantRegistry {
+    Map<String, Restaurant> restaurants = new ConcurrentHashMap<>();
+    List<String> predefinedRestaurantNames = Arrays.asList("Bawachi", "Swagat", "Abhiruchulu", "Paradise"); // Predefined restaurant names
+    
+    public synchronized void registerRestaurant(Restaurant restaurant) {
+        restaurants.put(restaurant.name.toLowerCase(), restaurant);
+        System.out.println("Successfully registered: " + restaurant.name);
+    }
+
+    public void addSlots(String restaurantName, String date) {
+        Restaurant restaurant = findRestaurant(restaurantName);
+        if (restaurant != null) {
+            restaurant.slots.putIfAbsent(date, new ArrayList<>(Collections.nCopies(5, Boolean.TRUE))); // Assuming 5 slots per day
+            System.out.println("Slots added for " + restaurantName + " on " + date);
+        } else {
+            System.out.println("Restaurant not found: " + restaurantName);
+        }
+    }
+
+    public List<Restaurant> searchRestaurants(String attribute, String value) {
+        List<Restaurant> result = new ArrayList<>();
+        for (Restaurant restaurant : restaurants.values()) {
+            switch (attribute.toLowerCase()) {
+                case "name":
+                    if (restaurant.name.equalsIgnoreCase(value)) result.add(restaurant);
+                    break;
+                case "city":
+                    if (restaurant.city.equalsIgnoreCase(value)) result.add(restaurant);
+                    break;
+                case "area":
+                    if (restaurant.area.equalsIgnoreCase(value)) result.add(restaurant);
+                    break;
+                case "cuisine":
+                    if (restaurant.cuisine.equalsIgnoreCase(value)) result.add(restaurant);
+                    break;
+                case "rating":
+                    if (restaurant.rating == Double.parseDouble(value)) result.add(restaurant);
+                    break;
+                case "costfortwo":
+                    if (restaurant.costForTwo == Double.parseDouble(value)) result.add(restaurant);
+                    break;
+                case "veg":
+                    if (restaurant.isVeg == Boolean.parseBoolean(value)) result.add(restaurant);
+                    break;
+            }
+        }
+        return result;
+    }
+
+    public synchronized boolean bookTable(String restaurantName, String date, int slot) {
+        Restaurant restaurant = findRestaurant(restaurantName);
+        if (restaurant != null && restaurant.slots.containsKey(date) && slot >= 0 && slot < 5) {
+            List<Boolean> daySlots = restaurant.slots.get(date);
+            if (daySlots.get(slot)) {
+                daySlots.set(slot, Boolean.FALSE);
+                String timeSlot = getTimeSlot(slot);
+                System.out.println("Successfully booked slot at " + restaurantName + " on " + date + " for slot " + (slot + 1) + ": " + timeSlot);
+                return true;
+            } else {
+                System.out.println("Slot not available.");
+            }
+        } else {
+            System.out.println("Invalid slot or restaurant not found.");
+        }
+        return false;
+    }
+    
+    private String getTimeSlot(int slot) {
+        switch (slot) {
+            case 0: return "2:00-3:00pm";
+            case 1: return "4:00-5:00pm";
+            case 2: return "6:00-7:00pm";
+            case 3: return "8:00-9:00pm";
+            case 4: return "10:00-11:00pm";
+            default: return "";
+        }
+    }
+    
+    public boolean isPredefinedRestaurant(String restaurantName) {
+        return predefinedRestaurantNames.stream()
+                .anyMatch(name -> name.equalsIgnoreCase(restaurantName));
+    }
+
+    public void displayAvailableSlots(String restaurantName) {
+        Random random = new Random();
+        // Assume some predefined slots for simplicity
+        List<String> availableSlots = Arrays.asList(
+                "2:00-3:00pm", "4:00-5:00pm", "6:00-7:00pm", "8:00-9:00pm", "10:00-11:00pm"
+        );
+        System.out.println("Available slots for " + restaurantName + ":");
+        for (int i = 0; i < availableSlots.size(); i++) {
+            System.out.println((i + 1) + ". " + availableSlots.get(i));
+        }
+    }
+
+    private Restaurant findRestaurant(String restaurantName) {
+        for (Restaurant restaurant : restaurants.values()) {
+            if (restaurant.name.equalsIgnoreCase(restaurantName)) {
+                return restaurant;
+            }
+        }
+        return null;
+    }
+}
+
+public class RestaurantBookingApp {
+    public static void main(String[] args) {
+        RestaurantRegistry registry = new RestaurantRegistry();
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.println("1. Register Restaurant\n2. Add Slots\n3. Search Restaurant\n4. Book Table\n5. Exit");
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // consume newline
+            switch (choice) {
+                case 1:
+                    System.out.print("Enter name: ");
+                    String name = scanner.nextLine();
+                    System.out.print("Enter city: ");
+                    String city = scanner.nextLine();
+                    System.out.print("Enter area: ");
+                    String area = scanner.nextLine();
+                    System.out.print("Enter cuisine: ");
+                    String cuisine = scanner.nextLine();
+                    System.out.print("Enter rating: ");
+                    double rating = scanner.nextDouble();
+                    System.out.print("Enter cost for two: ");
+                    double costForTwo = scanner.nextDouble();
+                    System.out.print("Is it veg (true/false): ");
+                    boolean isVeg = scanner.nextBoolean();
+                    scanner.nextLine(); // consume newline
+                    Restaurant restaurant = new Restaurant(name, city, area, cuisine, rating, costForTwo, isVeg);
+                    registry.registerRestaurant(restaurant);
+                    break;
+                case 2:
+                    System.out.print("Enter restaurant name: ");
+                    String restaurantNameAdd = scanner.nextLine();
+                    System.out.print("Enter date (YYYY-MM-DD): ");
+                    String dateAdd = scanner.nextLine();
+                    registry.addSlots(restaurantNameAdd, dateAdd);
+                    break;
+                case 3:
+                    System.out.print("Enter attribute to search (name, city, area, cuisine, rating, costfortwo, veg): ");
+                    String attribute = scanner.nextLine();
+                    System.out.print("Enter value: ");
+                    String value = scanner.nextLine();
+                    List<Restaurant> results = registry.searchRestaurants(attribute, value);
+                    if (results.isEmpty()) {
+                        System.out.println("No restaurants found.");
+                    } else {
+                        for (Restaurant res : results) {
+                            System.out.println("Found: " + res.name + " in " + res.city + ", " + res.area + " (" + res.cuisine + ")");
+                        }
+                    }
+                    break;
+                case 4:
+                    System.out.print("Enter restaurant name: ");
+                    String bookRestaurantName = scanner.nextLine();
+                    if (registry.isPredefinedRestaurant(bookRestaurantName)) {
+                        registry.displayAvailableSlots(bookRestaurantName);
+                        System.out.print("Enter date (YYYY-MM-DD): ");
+                        String bookDate = scanner.nextLine();
+                        System.out.print("Enter slot (1-5): "); // Assuming 5 available slots
+                        int slot = scanner.nextInt() - 1; // Adjusted to 0-based index
+                        scanner.nextLine(); // consume newline after nextInt()
+                        if (slot >= 0 && slot < 5) {
+                            if (registry.bookTable(bookRestaurantName, bookDate, slot)) {
+                                System.out.println("Booking Done.");
+                            }
+                        } else {
+                            System.out.println("Invalid slot number.");
+                        }
+                    } else {
+                        System.out.println("Invalid restaurant name.");
+                    }
+                    break;
+                case 5:
+                    scanner.close();
+                    return;
+                default:
+                    System.out.println("Invalid choice.");
+            }
+        }
+    }
+}
+
+
+# Input/Output:
+# 1. Register Restaurant
+# 2. Add Slots
+# 3. Search Restaurant
+# 4. Book Table
+# 5. Exit
+
+# Enter your choice: 1
+
+# Enter name: Paradise
+# Enter city: Hyderabad
+# Enter area: Banjara Hills
+# Enter cuisine: Indian
+# Enter rating: 4.5
+# Enter cost for two: 1000
+# Is it veg (true/false): true
+# Successfully registered: Paradise
+
+# 1. Register Restaurant
+# 2. Add Slots
+# 3. Search Restaurant
+# 4. Book Table
+# 5. Exit
+
+# Enter your choice: 2
+
+# Enter restaurant name: Paradise
+# Enter date (YYYY-MM-DD): 2024-06-23
+# Slots added for Paradise on 2024-06-23
+
+# 1. Register Restaurant
+# 2. Add Slots
+# 3. Search Restaurant
+# 4. Book Table
+# 5. Exit
+
+# Enter your choice: 3
+
+# Enter attribute to search (name, city, area, cuisine, rating, costfortwo, veg): name
+# Enter value: Paradise
+# Found: Paradise in Hyderabad, Banjara Hills (Indian)
+
+# 1. Register Restaurant
+# 2. Add Slots
+# 3. Search Restaurant
+# 4. Book Table
+# 5. Exit
+
+# Enter your choice: 4
+
+# Enter restaurant name: Paradise
+# Available slots for Paradise:
+# 1. 2:00-3:00pm
+# 2. 4:00-5:00pm
+# 3. 6:00-7:00pm
+# 4. 8:00-9:00pm
+# 5. 10:00-11:00pm
+# Enter date (YYYY-MM-DD): 2024-06-23
+# Enter slot (1-5): 1
+# Successfully booked slot at Paradise on 2024-06-23 for slot 1: 2:00-3:00pm
+# Booking Done.
+
+# 1. Register Restaurant
+# 2. Add Slots
+# 3. Search Restaurant
+# 4. Book Table
+# 5. Exit
+
+# Enter your choice: 5
+
+# Exiting...
+
